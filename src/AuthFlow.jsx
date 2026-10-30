@@ -1,59 +1,37 @@
 import { useState } from 'react';
 import './AuthFlow.css';
-const DEMO_CODE = '8421';
 const Field = ({ label, ...props }) => <label className="auth-field">{label}<input {...props} /></label>;
 
 export default function AuthFlow({ onComplete, isDark, onToggleTheme }) {
-  const [step, setStep] = useState('role');
-  const [role, setRole] = useState('sender');
+  const [page, setPage] = useState('intro');
   const [mode, setMode] = useState('register');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const update = callback => event => { setError(''); callback(event.target.value); };
-  const finish = (cardAdded = false) => onComplete({ role, fullName, email, phone, cardAdded });
-
-  function continueWithAccount(event) {
+  function openAuth(nextMode) { setMode(nextMode); setError(''); setPage('auth'); }
+  function submit(event) {
     event.preventDefault(); setError('');
     const form = event.currentTarget;
-    const name = form.querySelector('[autocomplete="name"]');
-    const emailField = form.querySelector('input[type="email"]');
-    const tel = form.querySelector('input[type="tel"]');
+    const emailInput = form.querySelector('input[type="email"]');
     const password = form.querySelector('input[type="password"]');
-    if (name && fullName.trim().split(/\s+/).length < 2) { setError('Вкажіть, будь ласка, ім’я та прізвище.'); name.focus(); return; }
-    if (emailField && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Введіть коректну адресу електронної пошти, наприклад name@example.com.'); emailField.focus(); return; }
-    if (!phone.trim()) { setError('Введіть номер телефону.'); tel.focus(); return; }
-    if (password && password.value.length < 8) { setError('Пароль має містити щонайменше 8 символів.'); password.focus(); return; }
-    setStep('phone');
-  }
-  function confirmCode(event) {
-    event.preventDefault();
-    if (code.length !== 4) { setError('Введіть чотири цифри з SMS.'); return; }
-    if (code !== DEMO_CODE) { setError(`Для демонстрації введіть код ${DEMO_CODE}.`); return; }
-    setError(''); setStep('verified');
-  }
-  function completeCard(event) {
-    event.preventDefault();
-    const input = [...event.currentTarget.querySelectorAll('input')].find(item => !item.value.trim());
-    if (input) { setError(`Заповніть поле «${input.closest('label')?.childNodes[0]?.textContent?.trim() || 'поле'}».`); input.focus(); return; }
-    setError(''); finish(true);
+    const nameInput = form.querySelector('[autocomplete="name"]');
+    const phoneInput = form.querySelector('input[type="tel"]');
+    if (mode === 'register' && fullName.trim().split(/\s+/).length < 2) { setError('Вкажіть ім’я та прізвище.'); nameInput.focus(); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Введіть коректну адресу електронної пошти.'); emailInput.focus(); return; }
+    if (password.value.length < 8) { setError('Пароль має містити щонайменше 8 символів.'); password.focus(); return; }
+    if (mode === 'register' && !phone.trim()) { setError('Введіть номер телефону.'); phoneInput.focus(); return; }
+    onComplete({ fullName: mode === 'register' ? fullName.trim() : email.split('@')[0], email: email.trim(), phone: mode === 'register' ? phone.trim() : '' });
   }
   const themeButton = <button className="theme-toggle" type="button" onClick={onToggleTheme}>{isDark ? '☀️ Світла тема' : '🌙 Темна тема'}</button>;
 
-  return <main className="auth-layout">
-    <header className="auth-header"><div className="auth-brand"><img src="/passby-icon.png" alt=""/><span>PassBy</span></div><span>Сервіс доставки</span>{themeButton}</header>
-    <section className="auth-panel">
-      {step === 'role' && <><div className="auth-step">ПОЧАТОК · КРОК 1 З 3</div><h1>Оберіть роль</h1><p className="auth-muted">Оберіть, як ви плануєте користуватися PassBy.</p><div className="role-options">
-        <button className={`role-choice ${role === 'sender' ? 'is-selected' : ''}`} onClick={() => setRole('sender')}><span className="role-symbol">📦</span><span><b>Відправник</b><small>Створювати відправлення та знаходити кур’єрів</small></span><i/></button>
-        <button className={`role-choice ${role === 'courier' ? 'is-selected' : ''}`} onClick={() => setRole('courier')}><span className="role-symbol">🚴</span><span><b>Кур’єр</b><small>Приймати доставки та отримувати оплату</small></span><i/></button>
-      </div><button className="auth-primary" onClick={() => setStep('account')}>Продовжити <span>→</span></button></>}
-      {step === 'account' && <><button className="auth-back" onClick={() => setStep('role')}>← Назад</button><div className="auth-step">{role === 'courier' ? 'КАБІНЕТ КУР’ЄРА' : 'КАБІНЕТ ВІДПРАВНИКА'}</div><h1>{mode === 'register' ? 'Створити акаунт' : 'Увійти в акаунт'}</h1><p className="auth-muted">{mode === 'register' ? 'Заповніть дані та підтвердьте номер телефону.' : 'Введіть дані акаунта й підтвердьте номер телефону.'}</p>
-        <div className="auth-tabs"><button className={mode === 'login' ? 'current' : ''} onClick={() => setMode('login')}>Вхід</button><button className={mode === 'register' ? 'current' : ''} onClick={() => setMode('register')}>Реєстрація</button></div>
-        <form className="auth-form" onSubmit={continueWithAccount} noValidate>{mode === 'register' && <><Field label="Ім’я та прізвище" required autoComplete="name" placeholder="Наприклад, Анна Іваненко" value={fullName} onChange={update(setFullName)}/><Field label="Електронна пошта" required type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={update(setEmail)}/></>}<Field label="Номер телефону" required type="tel" autoComplete="tel" placeholder="+380 67 123 45 67" value={phone} onChange={update(setPhone)}/>{role === 'courier' && <Field label="Пароль" required type="password" minLength="8" placeholder="Щонайменше 8 символів"/>}{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit">{mode === 'register' ? 'Продовжити' : 'Увійти та підтвердити телефон'} <span>→</span></button></form></>}
-      {step === 'phone' && <><button className="auth-back" onClick={() => setStep('account')}>← Назад</button><div className="auth-step">ПІДТВЕРДЖЕННЯ ТЕЛЕФОНУ</div><h1>Введіть код із SMS</h1><p className="auth-muted">Надіслали код на <b>{phone}</b></p><form className="auth-form" onSubmit={confirmCode} noValidate><Field label="Код підтвердження" inputMode="numeric" autoComplete="one-time-code" maxLength="4" placeholder="4 цифри" value={code} onChange={update(value => setCode(value.replace(/\D/g, '').slice(0,4)))} />{error && <p className="auth-error" role="alert">{error}</p>}<p className="auth-demo">Демо-режим: SMS не надсилаються. Введіть код {DEMO_CODE}.</p><button className="auth-primary">Підтвердити номер <span>→</span></button></form></>}
-      {step === 'verified' && <><button className="auth-back" onClick={() => setStep('phone')}>← Назад</button><div className="auth-success">✓</div><div className="auth-step">НОМЕР ПІДТВЕРДЖЕНО</div><h1>{role === 'courier' ? 'Дані кур’єра' : 'Акаунт готовий'}</h1><p className="auth-muted">{role === 'courier' ? 'Додайте картку для виплат. Це демонстраційна форма.' : 'Можна перейти на головний екран.'}</p>{role === 'courier' ? <form className="auth-form" onSubmit={completeCard} noValidate><Field label="Номер картки (демо)" inputMode="numeric" placeholder="0000 0000 0000 0000"/><div className="card-fields"><Field label="Термін дії" placeholder="ММ/РР"/><Field label="CVV" type="password" placeholder="•••"/></div>{error && <p className="auth-error" role="alert">{error}</p>}<p className="auth-demo">Не вводьте справжні платіжні дані: вони не зберігаються.</p><button className="auth-primary">Зберегти та продовжити <span>→</span></button><button type="button" className="auth-skip" onClick={() => finish()}>Додати картку пізніше</button></form> : <button className="auth-primary" onClick={() => finish()}>Відкрити головний екран <span>→</span></button>}</>}
-    </section><footer className="auth-footer">PassBy · Доставка починається тут</footer>
+  if (page === 'intro') return <main className="intro-page">
+    <header className="intro-header"><a className="brand" href="#top"><img src="/passby-icon.png" alt=""/><b>PassBy</b></a><div>{themeButton}<button className="header-link" onClick={() => openAuth('login')}>Увійти</button></div></header>
+    <section className="intro-hero" id="top"><div className="intro-copy"><span className="eyebrow">ПОПУТНА ДОСТАВКА ПОСИЛОК</span><h1>Посилка їде туди.<br/><em>Кур’єр — дорогою.</em></h1><p>PassBy поєднує людей, які хочуть надіслати посилку, з тими, хто вже прямує у потрібному напрямку та може доставити її дорогою.</p><div className="intro-actions"><button className="primary-button" onClick={() => openAuth('register')}>Створити акаунт <span>→</span></button><button className="quiet-button" onClick={() => openAuth('login')}>У мене вже є акаунт</button></div><div className="intro-points"><span>✓ Зручно для відправника</span><span>✓ Винагорода для кур’єра</span></div></div><div className="intro-visual"><div className="route-line"/><div className="route-point point-a">📦</div><div className="route-point point-b">🚲</div><div className="route-card"><b>Одна дорога — дві користі</b><small>Посилка знаходить попутний маршрут</small></div></div></section>
+    <section className="intro-how"><div><span className="eyebrow">ЯК ЦЕ ПРАЦЮЄ</span><h2>З’єднуємо тих, кому по дорозі</h2></div><article><b>01 · Відправник</b><p>Вказує, звідки та куди потрібно доставити посилку.</p></article><article><b>02 · PassBy</b><p>Поєднує відправника з людиною на відповідному маршруті.</p></article><article><b>03 · Кур’єр</b><p>Бере посилку з собою та отримує винагороду.</p></article></section><footer className="intro-footer">PassBy · Доставка починається тут</footer>
   </main>;
+
+  return <main className="auth-layout"><header className="auth-header"><a className="auth-brand" href="#" onClick={event => {event.preventDefault();setPage('intro');}}><img src="/passby-icon.png" alt=""/><span>PassBy</span></a><span>Сервіс попутної доставки</span>{themeButton}</header><section className="auth-panel"><button className="auth-back" onClick={() => setPage('intro')}>← На головну</button><div className="auth-step">{mode === 'register' ? 'НОВИЙ АКАУНТ' : 'ВХІД ДО PASSBY'}</div><h1>{mode === 'register' ? 'Створити акаунт' : 'З поверненням!'}</h1><p className="auth-muted">{mode === 'register' ? 'Зареєструйтеся, щоб надіслати посилку або доставити її дорогою.' : 'Увійдіть за електронною поштою та паролем.'}</p><div className="auth-tabs"><button className={mode === 'login' ? 'current' : ''} onClick={() => {setMode('login');setError('');}}>Вхід</button><button className={mode === 'register' ? 'current' : ''} onClick={() => {setMode('register');setError('');}}>Реєстрація</button></div><form className="auth-form" noValidate onSubmit={submit}>{mode === 'register' && <><Field label="Ім’я та прізвище" required autoComplete="name" placeholder="Наприклад, Анна Іваненко" value={fullName} onChange={update(setFullName)}/><Field label="Електронна пошта" required type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={update(setEmail)}/></>}{mode === 'login' && <Field label="Електронна пошта" required type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={update(setEmail)}/>}<Field label="Пароль" required type="password" minLength="8" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} placeholder="Щонайменше 8 символів"/>{mode === 'register' && <Field label="Номер телефону" required type="tel" autoComplete="tel" placeholder="+380 67 123 45 67" value={phone} onChange={update(setPhone)}/>}{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit">{mode === 'register' ? 'Зареєструватися' : 'Увійти'} <span>→</span></button></form><p className="auth-switch">{mode === 'register' ? 'Вже маєте акаунт?' : 'Ще не маєте акаунта?'} <button onClick={() => {setMode(mode === 'register' ? 'login' : 'register');setError('');}}>{mode === 'register' ? 'Увійти' : 'Зареєструватися'}</button></p><p className="auth-demo">Демонстраційний режим: сервер авторизації не підключено; пароль не зберігається.</p></section><footer className="auth-footer">PassBy · Доставка починається тут</footer></main>;
 }
+

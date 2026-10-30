@@ -1,26 +1,47 @@
 import { useState } from 'react';
 import AuthFlow from './AuthFlow';
+const emptyProgress = { role: null, documentValidated: false, identityVerified: false, paymentAdded: false };
+function readProgress(email) { try { return { ...emptyProgress, ...JSON.parse(localStorage.getItem(`passby-progress:${email.toLowerCase()}`) || '{}') }; } catch { return emptyProgress; } }
 
-function Home({ account, onLogout, isDark, onToggleTheme }) {
-  return <main className="empty-home">
-    <header className="home-header"><div className="home-brand"><img src="/passby-icon.png" alt="" />PassBy</div><span>{account.role === 'courier' ? 'Кур’єр' : 'Відправник'}</span><button className="theme-toggle" type="button" onClick={onToggleTheme} aria-label={isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}>{isDark ? '☀️ Світла тема' : '🌙 Темна тема'}</button></header>
-    <section className="home-card"><div className="home-badge">✓ Номер підтверджено</div><h1>Вітаємо у PassBy</h1><p>Головний екран поки порожній. Тут згодом з’являться функції доставки.</p><button onClick={onLogout}>Вийти з акаунта</button></section>
+function Dashboard({ account, progress, onProgress, isDark, onToggleTheme, onLogout }) {
+  const [modal, setModal] = useState('');
+  const [toast, setToast] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  function saveProgress(patch) { const next = { ...progress, ...patch }; localStorage.setItem(`passby-progress:${account.email.toLowerCase()}`, JSON.stringify(next)); onProgress(next); }
+  function requestRole() { setToast('Для виконання дії підтвердіть роль.'); setModal('role'); window.setTimeout(() => setToast(''), 3200); }
+  function tryAction(message) { if (!progress.role) requestRole(); else { setToast(message); window.setTimeout(() => setToast(''), 3000); } }
+  const roleName = progress.role === 'sender' ? 'Відправник' : progress.role === 'courier' ? 'Кур’єр' : 'Роль не обрана';
+  const verificationLabel = progress.identityVerified ? 'Особу підтверджено' : progress.documentValidated ? 'Підтвердьте особу' : 'Документ не перевірено';
+  return <main className="dashboard-page">
+    <header className="dashboard-header"><div className="brand"><img src="/passby-icon.png" alt=""/><b>PassBy</b></div><nav><button onClick={() => tryAction('Відкриваємо стрічку замовлень…')}>Замовлення</button><button onClick={() => tryAction('Відкриваємо профіль…')}>Профіль</button></nav><span className="account-chip">{account.fullName || account.email}</span><button className="theme-toggle" onClick={onToggleTheme}>{isDark ? '☀️ Світла' : '🌙 Темна'}</button><button className="header-link" onClick={onLogout}>Вийти</button></header>
+    <div className="dashboard-content"><section className="dashboard-main">
+      <div className="welcome-strip"><div><span className="eyebrow">ПЛАТФОРМА СПІЛЬНОЇ ДОСТАВКИ</span><h1>{progress.role ? `Вітаємо, ${account.fullName?.split(' ')[0] || 'у PassBy'}!` : 'Попередній макет PassBy'}</h1><p>{progress.role ? (progress.role === 'sender' ? 'Знайдіть попутного кур’єра для своєї посилки.' : 'Переглядайте посилки, які можна доставити дорогою.') : 'Оберіть роль, щоб відкрити робочий інтерфейс. Поки що це макет для ознайомлення.'}</p></div><div className="welcome-art">📦<span>↗</span>🚲</div></div>
+      {!progress.role ? <div className="role-gate"><div className="gate-icon">✦</div><div><h2>Це демонстраційний макет</h2><p>Кнопки показують вигляд сервісу. Щоб створювати відправлення чи брати їх у доставку, підтвердьте роль у профілі.</p></div><button className="primary-button" onClick={() => setModal('role')}>Обрати роль</button></div> : <div className="active-role-banner"><span className="verified-mark">✓</span><div><b>Активний інтерфейс: {roleName.toLowerCase()}</b><small>Роль прив’язана до цього акаунта. Її можна змінити в налаштуваннях.</small></div><button className="quiet-button" onClick={() => setModal('role')}>Змінити роль</button></div>}
+      <div className="content-heading"><div><h2>{progress.role === 'courier' ? 'Посилки поруч із вашим маршрутом' : 'Популярні напрямки'}</h2><p>{progress.role ? 'Приклади функцій платформи' : 'Попередній вигляд головного екрана'}</p></div><button className="quiet-button" onClick={() => tryAction('Список замовлень буде доступний після підключення сервісу.')}>Усі замовлення →</button></div>
+      <div className="sample-grid">{[['Київ → Львів','Документи · 0,5 кг','250 ₴'],['Одеса → Київ','Невелика посилка · 1,2 кг','320 ₴'],['Львів → Дніпро','Особисті речі · 2 кг','410 ₴']].map(([route,details,price]) => <article className="sample-card" key={route}><span className="sample-icon">📍</span><div><b>{route}</b><small>{details}</small></div><strong>{price}</strong><button onClick={() => tryAction(progress.role === 'courier' ? 'Ви обрали це замовлення (демо).' : 'Створення відправлення доступне після підтвердження ролі.')}>{progress.role === 'courier' ? 'Доставити' : 'Деталі'}</button></article>)}</div>
+      {!progress.role && <button className="create-order" onClick={() => tryAction('Для створення відправлення підтвердіть роль.')}>＋ Створити відправлення</button>}
+    </section>
+    <aside className="progress-panel"><div className="progress-title"><div><span className="eyebrow">НАЛАШТУВАННЯ ПРОФІЛЮ</span><h2>Підготовка акаунта</h2></div><span className="progress-count">{[progress.identityVerified,progress.paymentAdded,!!progress.role].filter(Boolean).length}/3</span></div>
+      <button className="progress-item" onClick={() => setModal('verify')}><span className={`task-number ${progress.identityVerified?'done':''}`}>{progress.identityVerified?'✓':'1'}</span><span><b>Верифікація</b><small>{verificationLabel}</small><em>{progress.documentValidated?'Документ перевірено':'Документ і підтвердження особи'}</em></span><span className="chevron">›</span></button>
+      <button className="progress-item" onClick={() => setModal('payment')}><span className={`task-number ${progress.paymentAdded?'done':''}`}>{progress.paymentAdded?'✓':'2'}</span><span><b>Спосіб оплати</b><small>{progress.paymentAdded?'Додано (демо)':'Ще не додано'}</small></span><span className="chevron">›</span></button>
+      <button className="progress-item" onClick={() => setModal('role')}><span className={`task-number ${progress.role?'done':''}`}>{progress.role?'✓':'3'}</span><span><b>Вибір ролі</b><small>{roleName}</small><em>Визначає доступні можливості</em></span><span className="chevron">›</span></button><p className="demo-caption">Демо-режим · прогрес зберігається у цьому браузері</p>
+    </aside></div>
+    {toast && <div className="toast" role="status">{toast}</div>}
+    {modal && <div className="modal-backdrop" onClick={() => setModal('')}><section className="modal-card" onClick={event => event.stopPropagation()}><button className="modal-close" onClick={() => setModal('')} aria-label="Закрити">×</button>
+      {modal === 'role' && <><span className="modal-kicker">КРОК 3 · ВИБІР РОЛІ</span><h2>Оберіть свою роль</h2><p>Роль визначає доступні дії: відправляти посилки чи доставляти їх попутним маршрутом. Вона прив’язується до акаунта після вибору й доступна для зміни у профілі.</p><div className="role-modal-options"><button onClick={() => {saveProgress({role:'sender'});setModal('');}}><span>📦</span><b>Я відправник</b><small>Створювати та відстежувати посилки</small></button><button onClick={() => {saveProgress({role:'courier'});setModal('');}}><span>🚲</span><b>Я кур’єр</b><small>Доставляти посилки дорогою</small></button></div></>}
+      {modal === 'verify' && <><span className="modal-kicker">КРОК 1 · ВЕРИФІКАЦІЯ</span><h2>{progress.identityVerified?'Особу підтверджено':progress.documentValidated?'Це ваші дані?':'Перевірка документа'}</h2>{!progress.documentValidated ? <><p>Демо-симуляція: введіть номер документа, щоб показати отримання даних. Це не справжня державна перевірка.</p><label className="auth-field">Номер документа<input value={documentNumber} onChange={event => setDocumentNumber(event.target.value)} placeholder="Наприклад, AA123456" /></label><button className="primary-button modal-action" disabled={!documentNumber.trim()} onClick={() => saveProgress({documentValidated:true})}>Перевірити документ</button></> : !progress.identityVerified ? <><div className="lookup-result"><span>✓</span><div><b>Дані документа підтверджено (демо)</b><small>{account.fullName || 'Власник документа'}</small></div></div><p>Чи належать ці дані вам?</p><div className="modal-actions"><button className="primary-button" onClick={() => {saveProgress({identityVerified:true});setModal('');}}>Так, це я</button><button className="quiet-button" onClick={() => saveProgress({documentValidated:false})}>Ні, перевірити інший</button></div></> : <div className="lookup-result"><span>✓</span><div><b>Документ і особу підтверджено</b><small>{account.fullName || 'Акаунт користувача'}</small></div></div>}</>}
+      {modal === 'payment' && <><span className="modal-kicker">КРОК 2 · СПОСІБ ОПЛАТИ</span><h2>{progress.paymentAdded?'Спосіб оплати додано':'Додайте спосіб оплати'}</h2><p>Підключення платежів поки не реалізоване. Цей крок лише демонструє майбутній екран.</p><div className="payment-placeholder">💳 <span>Банківська картка</span><small>Платіжний сервіс буде підключено пізніше</small></div>{!progress.paymentAdded ? <button className="primary-button modal-action" onClick={() => {saveProgress({paymentAdded:true});setModal('');}}>Позначити доданим (демо)</button> : <button className="quiet-button" onClick={() => {saveProgress({paymentAdded:false});setModal('');}}>Скасувати демо-позначку</button>}</>}
+    </section></div>}
+    <footer className="dashboard-footer">PassBy · З’єднуємо відправників і тих, кому зручно доставити дорогою</footer>
   </main>;
 }
 
 export default function App() {
-  const [account, setAccount] = useState(null);
-  const [isDark, setIsDark] = useState(() => localStorage.getItem('passby-theme') === 'dark');
-  function toggleTheme() {
-    setIsDark(current => {
-      const next = !current;
-      localStorage.setItem('passby-theme', next ? 'dark' : 'light');
-      return next;
-    });
-  }
-  return <div className={`app-theme${isDark ? ' theme-dark' : ''}`}>
-    {account
-      ? <Home account={account} onLogout={() => setAccount(null)} isDark={isDark} onToggleTheme={toggleTheme} />
-      : <AuthFlow onComplete={setAccount} isDark={isDark} onToggleTheme={toggleTheme} />}
-  </div>;
+  const [account,setAccount] = useState(null);
+  const [progress,setProgress] = useState(emptyProgress);
+  const [isDark,setIsDark] = useState(() => localStorage.getItem('passby-theme') === 'dark');
+  function enterAccount(info) { setAccount(info); setProgress(readProgress(info.email)); }
+  function updateProgress(next) { setProgress(next); if(account?.email) localStorage.setItem(`passby-progress:${account.email.toLowerCase()}`,JSON.stringify(next)); }
+  function toggleTheme() { setIsDark(current => { const next=!current;localStorage.setItem('passby-theme',next?'dark':'light');return next; }); }
+  return <div className={`app-theme${isDark?' theme-dark':''}`}>{account ? <Dashboard account={account} progress={progress} onProgress={updateProgress} isDark={isDark} onToggleTheme={toggleTheme} onLogout={() => {setAccount(null);setProgress(emptyProgress);}}/> : <AuthFlow onComplete={enterAccount} isDark={isDark} onToggleTheme={toggleTheme}/>}</div>;
 }
