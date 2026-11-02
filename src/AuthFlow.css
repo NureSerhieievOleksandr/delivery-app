@@ -4,3 +4,6 @@
 .theme-dark .welcome-strip{background:linear-gradient(110deg,#1b2b43,#243650);border-color:#344861}
 .theme-dark .welcome-strip h1{color:#f2f5fb}
 .theme-dark .welcome-strip p{color:#bdc9d8}
+
+/* Keep both route stops clear of the route summary on narrow screens. */
+@media(max-width:560px){.intro-visual{height:290px}.point-b{bottom:34%}.route-card{bottom:14px}}
